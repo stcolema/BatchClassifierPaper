@@ -1,5 +1,5 @@
 # BatchClassifierPaper
-Private repo for the analysis and writing of the batch mixture model paper. Note that all scripts assume that the ``BatchClassifierPaper`` directory is the working directory.
+Repo for the analysis and writing of [Coleman et al., 2020][https://doi.org/10.1101/2022.01.14.476352]. Note that all scripts assume that the ``BatchClassifierPaper`` directory is the working directory.
 
 Many of the scripts in this repo require some of the lead author's R package. To install these please run the following lines of code:
 
