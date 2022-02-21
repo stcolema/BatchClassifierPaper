@@ -1,5 +1,12 @@
-# BatchPaper
-Private repo for the analysis and writing of the batch mixture model paper. Note that all scripts assume that the ``BatchPaper`` directory is the working directory.
+# BatchClassifierPaper
+Repository for the analysis of [Coleman et al., 2022](https://doi.org/10.1101/2022.01.14.476352). Note that all scripts assume that the ``BatchClassifierPaper`` directory is the working directory.
+
+Many of the scripts in this repo require some of the lead author's R packages. To install these please run the following lines of code:
+
+```
+devtools::install_github("stcolema/BatchMixtureModel", ref = "Paper")
+devtools::install_github("stcolema/mdiHelpR")
+```
 
 ## Simulation study
 To recreate the simulation study analysis, the scripts that are in the ``Scripts/Simulations/`` directory are called in the following order:
