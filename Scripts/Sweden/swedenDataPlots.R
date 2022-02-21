@@ -1,11 +1,11 @@
 #
 # Plots for the ELISA data from Dopico et al., 2021.
-# We plot the 
+# We plot the
 #   * the observed data and the controls
 #   * complete log-likelihood to check within/across chain convergence
 #   * the inferred and observed data
 #   * allocation probability proportion over time
-# 
+#
 # === Setup ====================================================================
 library(BatchMixtureModel)
 library(mdiHelpR)
@@ -16,9 +16,14 @@ library(mcclust)
 library(tibble)
 library(dplyr)
 library(stringr)
+library(patchwork)
 
 setMyTheme()
 set.seed(1)
+
+# Flag indicating if the paper branch of the batch mixture model package is used
+# or the most recent
+batchPackageIsCurrent <- FALSE
 
 # Data lives in the repo:
 # "https://github.com/chr1swallace/seroprevalence-paper/blob/master/adjusted-data.RData"
@@ -35,7 +40,7 @@ m <- m[-drop_sample_in_12, ]
 
 # Drop the "patient 4" samples
 patient_4 <- which(m$type == "Patient 4")
-patient_4_data <- m[patient_4,]
+patient_4_data <- m[patient_4, ]
 m <- m[-patient_4, ]
 
 
@@ -75,7 +80,7 @@ cols_of_interest <- c("SPIKE", "RBD")
 cols_used <- which(colnames(m) %in% cols_of_interest)
 
 # Log transform the data when in matrix form
-X <- log(as.matrix(m[, cols_used])) %>%
+X <- log(as.matrix(m[, ..cols_used])) %>%
   set_rownames(paste0("Person_", 1:N)) %>%
   set_colnames(cols_of_interest)
 
@@ -94,27 +99,27 @@ control_df <- plot_df %>%
 control_df$Controls <- "Controls"
 plot_df$Controls <- "Full dataset"
 
-p_data <- rbind(plot_df, control_df) %>% 
+p_data <- rbind(plot_df, control_df) %>%
   ggplot(aes(x = SPIKE, y = RBD, colour = factor(Label,
-                                                 labels = c("Seronegative", "Seropositive", "Unknown")
+    labels = c("Seronegative", "Seropositive", "Unknown")
   ))) +
   geom_point(size = 0.7) +
   facet_grid(~Controls) +
   labs(
     # title = "ELISA data",
     x = "Log-transformed observed SPIKE measurement",
-    y = "Observed RBD measurement",
-    colour = "Group"
+    y = "Log-transformed observed RBD measurement",
+    colour = "Class"
   ) +
   ggthemes::scale_color_colorblind()
 
 ggsave(paste0(save_dir, "ELISA_observed_and_controls.png"),
-       plot = p_data,
-       width = 8,
-       height = 5
+  plot = p_data,
+  width = 8,
+  height = 5
 )
 
-# 
+#
 # p_controls <- plot_df[fixed == 1, ] %>%
 #   # mutate(Plot_label = as.numeric(factor(Label, levels = c("Historical controls", "COVID")))) %>%
 #   ggplot(aes(
@@ -131,8 +136,8 @@ ggsave(paste0(save_dir, "ELISA_observed_and_controls.png"),
 #     colour = "Class"
 #   ) +
 #   ggthemes::scale_color_colorblind()
-# 
-# 
+#
+#
 # ggsave(paste0(save_dir, "ELISA_controls.png"),
 #        plot = p_controls,
 #        width = 5,
@@ -159,9 +164,9 @@ initial_labels[positive_controls] <- 2
 
 # We then sample with equal probability the class for the remaining items
 initial_labels[-c(negative_controls, positive_controls)] <- sample(1:2,
-                                                                   size = N - N_positive - N_negative,
-                                                                   replace = TRUE,
-                                                                   prob = c(1, 1)
+  size = N - N_positive - N_negative,
+  replace = TRUE,
+  prob = c(1, 1)
 )
 
 # Convert the batch vector to integers
@@ -184,18 +189,26 @@ eff_burn <- burn / thin
 chain_used <- 3
 
 # MCMC samples
-mvt_samples <- readRDS(paste0("./Analysis/Sweden/Outputs/Chains/sweden_mvt_chain_",
-                              chain_used, 
-                              "_m_scale_1e-01_rho_11_theta_5.rds")
-)
+mvt_samples <- readRDS(paste0(
+  "./Analysis/Sweden/Outputs/Chains/sweden_mvt_chain_",
+  chain_used,
+  "_m_scale_1e-01_rho_11_theta_5.rds"
+))
 # mvn_samples <- readRDS("./Analysis/Outputs/sweden_mvn_chain_4.rds")
 
 
 
-# # === Parameter inference ======================================================
+# === Parameter inference ======================================================
 
 # Allocations
-mvt_prob <- calcAllocProb(mvt_samples$alloc, eff_burn)
+if (batchPackageIsCurrent) {
+  mvt_samples$R <- R
+  mvt_samples$thin <- thin
+
+  mvt_prob <- calcAllocProb(mvt_samples, burn)
+} else {
+  mvt_prob <- calcAllocProb(mvt_samples$alloc, eff_burn)
+}
 mvt_pred <- predictClass(mvt_prob)
 
 # Inferred datasets
@@ -215,56 +228,66 @@ mvt_inferred_data <- rowMeans(mvt_samples$batch_corrected_data[, , -c(1:eff_burn
 
 
 p_inferred <- mvt_inferred_data %>%
-  ggplot(aes(x = SPIKE, y = RBD))  +
-  geom_point(aes(shape = factor(Fixed, label = c("False", "True")),
-    colour = factor(Label,
-      labels = c("Seronegative", "Seropositive")
-    ),
-  alpha = Prob,
-  size = Fixed) #, size = 1
+  ggplot(aes(
+    x = SPIKE,
+    y = RBD,
+    shape = factor(Fixed, label = c("False", "True")),
+  )) +
+  geom_point(
+    aes(
+      colour = factor(Label,
+        levels = c(1, 2, 0),
+        labels = c("Seronegative", "Seropositive", "Unknown")
+
+        # labels = c("Seronegative", "Seropositive")
+      ),
+      alpha = Prob,
+      size = factor(Fixed, label = c("False", "True"))
+    ) # , size = 1
   ) +
   scale_alpha_continuous(range = c(0.4, 1.0)) +
   # geom_density_2d(aes(colour = Predicted)) +
-  ggthemes::scale_color_colorblind() +  
+  ggthemes::scale_color_colorblind() +
   labs(
     # title = "Elisa data - batch adjusted",
     # subtitle = "Predicted labels",
     # caption = "log transformed"
-    x = "Log-corrected SPIKE OD",
-    y = "Log-corrected RBD OD",
-    colour = "Group",
+    x = "Log-transformed batch-corrected SPIKE OD",
+    y = "Log-transformed batch-corrected RBD OD",
+    colour = "Class",
     shape = "Control",
-    alpha = "Probability of\nallocation"
+    alpha = "Probability of\nallocation",
+    size = "Control"
   ) +
   scale_size_discrete(range = c(1.0, 1.6))
 
-p_observed <- plot_df %>% 
-  ggplot(aes(x = SPIKE, y = RBD, colour = factor(Label,
-    labels = c("Seronegative", "Seropositive", "Unknown")
-  ), 
-  shape = factor(Fixed, label = c("False", "True")),
-  )
-  ) +
+p_observed <- plot_df %>%
+  ggplot(aes(
+    x = SPIKE, y = RBD, colour = factor(Label,
+      labels = c("Seronegative", "Seropositive", "Unknown")
+    ),
+    shape = factor(Fixed, label = c("False", "True")),
+  )) +
   geom_point(aes(size = factor(Fixed, label = c("False", "True")))) +
   # facet_grid(~Controls) +
   labs(
     # title = "ELISA data",
-    x = "Log SPIKE OD",
-    y = "Log RBD OD",
-    colour = "Group",
+    x = "Log-transformed observed SPIKE OD",
+    y = "Log-transformed observed RBD OD",
+    colour = "Class",
     shape = "Control",
-    size = NULL
+    size = "Control"
   ) +
   ggthemes::scale_color_colorblind() +
   scale_size_discrete(range = c(1.0, 1.6))
 
 p_patchwork <- p_observed / p_inferred +
-  plot_annotation(tag_levels = 'A') +
-  plot_layout(guides = "collect") 
-  # theme(legend.position = "bottom")
+  plot_annotation(tag_levels = "A") +
+  plot_layout(guides = "collect")
+# theme(legend.position = "bottom")
 
 ggsave(paste0(save_dir, "observedAndMVTInferredData.png"),
   plot = p_patchwork,
   height = 8,
   width = 7
-  )
+)

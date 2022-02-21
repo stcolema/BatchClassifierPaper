@@ -29,6 +29,7 @@ confidenceEllipse <- function(mu = c(0, 0), Sigma = matrix(c(1, 0, 0, 1), 2, 2),
 
 setMyTheme()
 set.seed(1)
+batchPackageIsCurrent <- FALSE
 
 # Data lives in the repo:
 # "https://github.com/chr1swallace/seroprevalence-paper/blob/master/adjusted-data.RData"
@@ -112,9 +113,9 @@ p_data <- rbind(plot_df, control_df) %>%
   facet_grid(~Controls) +
   labs(
     # title = "ELISA data",
-    x = "Log-transformed observed SPIKE measurement",
-    y = "Observed RBD measurement",
-    colour = "Group"
+    x = "Log-transformed observed SPIKE OD",
+    y = "Log-transformed observed RBD OD",
+    colour = "Class"
   ) +
   ggthemes::scale_color_colorblind()
 
@@ -166,7 +167,16 @@ mvt_samples <- readRDS(paste0(
 
 
 # Allocations
-mvt_prob <- calcAllocProb(mvt_samples$alloc, eff_burn)
+
+# Allocations
+if (batchPackageIsCurrent) {
+  mvt_samples$R <- R
+  mvt_samples$thin <- thin
+  
+  mvt_prob <- calcAllocProb(mvt_samples, burn)
+} else {
+  mvt_prob <- calcAllocProb(mvt_samples$alloc, eff_burn)
+}
 mvt_pred <- predictClass(mvt_prob)
 
 
@@ -203,9 +213,9 @@ p_inferred <- mvt_inferred_data %>%
     # title = "Elisa data - batch adjusted",
     # subtitle = "Predicted labels",
     # caption = "log transformed"
-    x = "Log-corrected SPIKE OD",
-    y = "Log-corrected RBD OD",
-    colour = "Group",
+    x = "Log-transformed batch-corrected SPIKE OD",
+    y = "Log-transformed batch-corrected RBD OD",
+    colour = "Class",
     shape = "Control",
     alpha = "Probability of\nallocation"
   ) +
@@ -369,8 +379,8 @@ p1 <- patient_4_df %>%
              size = 3) +
   labs(colour = "Batch",
        shape = "Batch",
-       x = "Log SPIKE OD",
-       y = "Log RBD OD") +  
+       x = "Log-transformed observed SPIKE OD",
+       y = "Log-transformed observed RBD OD") +  
   # ggthemes::scale_color_colorblind() +
   xlim(c(-0.5, 0.25)) +
   ylim(c(-0.25, 0.25)) +
@@ -400,8 +410,8 @@ p2 <- transformed_patient_4 %>%
              size = 3) +
   labs(colour = "Batch",
        shape = "Batch",
-       x = "Log corrected SPIKE OD",
-       y = "Log corrected RBD OD") +
+       x = "Log-transformed batch-corrected SPIKE OD",
+       y = "Log-transformed batch-corrected RBD OD") +
   # ggthemes::scale_color_colorblind() +
   xlim(c(-0.5, 0.2)) +
   ylim(c(-0.25, 0.2)) +

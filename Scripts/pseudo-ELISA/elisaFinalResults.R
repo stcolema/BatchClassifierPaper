@@ -35,6 +35,8 @@ setMyTheme()
 # Set the random seed
 set.seed(1)
 
+batchPackageIsCurrent <- FALSE
+
 # Save the generated files to
 save_path <- "./Simulations/ELISA_like/Output/"
 
@@ -101,10 +103,10 @@ p_data <- elisa_sim %>%
   # facet_wrap(~Controls) + 
   ggthemes::scale_color_colorblind() +
   labs(
-    x = "Observed SPIKE OD",
-    y = "Observed RBD OD",
+    x = "Log-transformed observed SPIKE measurement",
+    y = "Log-transformed observed RBD measurement",
     shape = "Control",
-    colour = "Group"
+    colour = "Class"
   )
 
 layout = "
@@ -122,8 +124,16 @@ p_elisaLike <- wrap_plots(p_f1, p_distance, p_data, design =layout) + #widths = 
 mvt_samples <- readRDS("./Simulations/ELISA_like/Output/Chains/Sim3/MVT_chain_7_m_scale_1e-01_rho_11_theta_5.rds")
 
 # Allocations
-mvt_prob <- calcAllocProb(mvt_samples$alloc, eff_burn)
+if(batchPackageIsCurrent) {
+  mvt_samples$R <- R
+  mvt_samples$thin <- thin
+  
+  mvt_prob <- calcAllocProb(mvt_samples, burn)
+} else {
+  mvt_prob <- calcAllocProb(mvt_samples$alloc, eff_burn)
+}
 mvt_pred <- predictClass(mvt_prob)
+
 
 # Inferred datasets
 mvt_inferred_data <- rowMeans(mvt_samples$batch_corrected_data[, , -c(1:eff_burn)], dims = 2) %>%
@@ -157,7 +167,7 @@ p_inferred <- mvt_inferred_data %>%
     # caption = "log transformed"
     x = "Log-transformed batch-corrected SPIKE OD",
     y = "Log-transformed batch-corrected RBD OD",
-    colour = "Group",
+    colour = "Class",
     shape = "Control",
     alpha = "Probability of\nallocation"
   )

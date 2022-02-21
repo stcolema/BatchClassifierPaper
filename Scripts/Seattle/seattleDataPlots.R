@@ -20,6 +20,11 @@ library(patchwork)
 setMyTheme()
 set.seed(1)
 
+# Flag indicating if the paper branch of the batch mixture model package is used 
+# or the most recent
+batchPackageIsCurrent <- FALSE
+
+
 # Data lives in the repo:
 # "https://github.com/chr1swallace/seroprevalence-paper/blob/master/adjusted-data.RData"
 # Please download before proceeding if it is not already in the Data directory.
@@ -199,10 +204,17 @@ mvt_samples <- readRDS(paste0("./Analysis/Seattle/Outputs/Chains/seattle_mvt_cha
 
 
 
-# # === Parameter inference ======================================================
+# === Parameter inference ======================================================
 
 # Allocations
-mvt_prob <- calcAllocProb(mvt_samples$alloc, eff_burn)
+if(batchPackageIsCurrent) {
+  mvt_samples$R <- R
+  mvt_samples$thin <- thin
+  
+  mvt_prob <- calcAllocProb(mvt_samples, burn)
+} else {
+  mvt_prob <- calcAllocProb(mvt_samples$alloc, eff_burn)
+}
 mvt_pred <- predictClass(mvt_prob)
 
 # Inferred datasets
@@ -238,17 +250,21 @@ p_inferred <- mvt_inferred_data %>%
     # caption = "log transformed"
     x = "Batch",
     y = "Log-transformed batch-corrected RBD OD",
-    colour = "Group",
+    colour = "Class",
     shape = "Control",
     alpha = "Probability of\nallocation"
   )
 
 p_observed <- plot_df %>% 
-  ggplot(aes(x = Batch, y = RBD, colour = factor(Label,
-                                                 labels = c("Seronegative", "Seropositive", "Unknown")
-  ), 
-  shape = factor(Fixed, label = c("False", "True")),
-  )
+  ggplot(
+    aes(
+      x = Batch, 
+      y = RBD, 
+      colour = factor(Label,
+        labels = c("Seronegative", "Seropositive", "Unknown")
+      ), 
+      shape = factor(Fixed, label = c("False", "True")),
+    )
   ) +
   geom_jitter(size = 1) +
   # facet_grid(~Controls) +
@@ -256,7 +272,7 @@ p_observed <- plot_df %>%
     # title = "ELISA data",
     x = "Batch",
     y = "Log-transformed observed RBD OD",
-    colour = "Group",
+    colour = "Class",
     shape = "Control"
   ) +
   ggthemes::scale_color_colorblind()
